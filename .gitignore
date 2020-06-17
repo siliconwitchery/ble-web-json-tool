@@ -1,0 +1,4 @@
+# Files to ignore in source control
+
+# MacOS cache files
+.DS_Store
