@@ -4,7 +4,7 @@
     <title>SuperStack BLE Web Tool</title>
     <meta name="description" content="A platform to test SuperStack devices over bluetooth">
     <meta name="author" content="Silicon Witchery AB">
-
+    <script src="module-bluetooth.js"></script>
     <style>
         table {
             margin-left: auto;
@@ -109,16 +109,16 @@
 
     <div>
 
-        <button id="connectButton" onclick="connect()">Connect</button>
-        <input type="text" id="secKeyLink" placeholder="https://yourserver.com/secure.key  (coming soon)">
+        <button id="connectButton">Connect</button>
+        <input type="text" id="secKeyLink" placeholder="https://yourserver.com/secure.key">
         <br>
 
         <button id="appUpdateButton" disabled>Upload Application</button>
-        <input type="text" id="appUpdateLink" placeholder="https://yourserver.com/myapp.bin  (coming soon)">
+        <input type="text" id="appUpdateLink" placeholder="https://yourserver.com/myapp.bin">
         <br>
 
         <button class="my_red" id="fwUpdateButton" disabled>Update Firmware</button>
-        <input type="text" id="fwUpdateLink" placeholder="https://yourserver.com/firmware.zip  (coming soon)">
+        <input type="text" id="fwUpdateLink" placeholder="https://yourserver.com/firmware.zip">
         <br>
 
         <button id="deviceInfoButton" disabled>Get Device Info</button>
@@ -126,7 +126,7 @@
         <button id="deviceResetButton" disabled>Reset Device</button>
         <br>
 
-        <button id="sendButton" onclick="prettifyJSON()" disabled>Send</button>
+        <button id="sendButton" disabled>Send</button>
         <textarea type="text" id="outboundJSON" rows=6>{&#10  "request":["DEVICE"]&#10}</textarea>
         <br>
 
@@ -136,133 +136,52 @@
 
     </div>
     <script>
-        var bleService = 'environmental_sensing'
-        var bleCharacteristic = 'uv_index'
-        var bluetoothDeviceDetected
-        var gattCharacteristic
 
-        document.querySelector('#sendButton').addEventListener('click', function (event) {
-            if (isWebBluetoothEnabled()) {
-                send()
-            }
+        document.getElementById('connectButton').addEventListener('click', function () {
+            connectDisconnect()
+                .then(function (result) {
+                    switch (result) {
+                        case "disconnected":
+                            document.getElementById('connectButton').innerHTML = "<b>Disconnected</b>";
+                            document.getElementById('appUpdateButton').disabled = true;
+                            document.getElementById('fwUpdateButton').disabled = true;
+                            document.getElementById('sendButton').disabled = true;
+                            setTimeout(function(){
+                                document.getElementById('connectButton').innerHTML = "Connect";
+                            }, 2000);
+                            break;
+                        case "unsecure":
+                            document.getElementById('connectButton').innerHTML = "Connected <b>Unsecure</b>";
+                            document.getElementById('appUpdateButton').disabled = false;
+                            document.getElementById('fwUpdateButton').disabled = false;
+                            document.getElementById('sendButton').disabled = false;
+                            break;
+                    }
+                })
+                .catch(function (error) {
+                    document.getElementById('connectButton').innerHTML = "<b>" + error + "</b>";
+                })
         })
 
-        function isWebBluetoothEnabled() {
-            if (!navigator.bluetooth) {
-                console.log('Web Bluetooth API is not available in this browser!')
-                return false
-            }
+        document.getElementById('appUpdateButton').addEventListener('click', function () {
+            document.getElementById('appUpdateLink').placeholder = "Feature coming soon!";
+        })
 
-            return true
-        }
+        document.getElementById('fwUpdateButton').addEventListener('click', function () {
+            document.getElementById('fwUpdateLink').placeholder = "Feature coming soon!";
+        })
 
-        function connect() {
-
-            if (isWebBluetoothEnabled()) {
-                // if (bluetoothDeviceDetected) {
-                //     Promise.resolve()
-                //     console.log("Already connected")
-                // } else {
-                    let options = {
-                        filters: [{
-                            namePrefix: "SuperStack"
-                        }]
-                    }
-                    
-                    console.log('Scanning...')
-
-                    navigator.bluetooth.requestDevice(options).then(device => {
-                        bluetoothDeviceDetected = device
-                    }).catch(error => {
-                        console.log('Argh! ' + error)
-                    })
-                    .then(connectGATT)
-                .then(_ => {
-                    console.log('Reading UV Index...')
-                    return gattCharacteristic.readValue()
-                })
-                .catch(error => {
-                    console.log("Waiting to start reading " + error)
-
-                })
-                // }
-
-            }
-        }
-
-
-        function read() {
-            return (bluetoothDeviceDetected ? Promise.resolve() : getDeviceInfo())
-                .then(connectGATT)
-                .then(_ => {
-                    console.log('Reading UV Index...')
-                    return gattCharacteristic.readValue()
-                })
-                .catch(error => {
-                    document.getElementById("debugLog").innerHTML = "<b>Waiting to start reading:</b> " + error;
-
-                })
-            document.querySelector('#connectButton').innerHTML = "Disconnect"
-        }
-
-        function connectGATT() {
-            if (bluetoothDeviceDetected.gatt.connected && gattCharacteristic) {
-                return Promise.resolve()
-            }
-
-            return bluetoothDeviceDetected.gatt.connect()
-                .then(server => {
-                    console.log('Getting GATT Service...')
-                    return server.getPrimaryService(bleService)
-                })
-                .then(service => {
-                    console.log('Getting GATT Characteristic...')
-                    return service.getCharacteristic(bleCharacteristic)
-                })
-                .then(characteristic => {
-                    gattCharacteristic = characteristic
-                    gattCharacteristic.addEventListener('characteristicvaluechanged',
-                        handleChangedValue)
-                    document.querySelector('#start').disabled = false
-                    document.querySelector('#stop').disabled = true
-                })
-        }
-
-        function handleChangedValue(event) {
-            let value = event.target.value.getUint8(0)
-            var now = new Date()
-            console.log('> ' + now.getHours() + ':' + now.getMinutes() + ':' + now.getSeconds() + ' UV Index is ' +
-                value)
-        }
-
-        function send() {
-            document.querySelector('#outboundJSON').value = document.querySelector('#secKeyLinkInput').value
-        }
-
-        function stop() {
-            gattCharacteristic.stopNotifications()
-                .then(_ => {
-                    console.log('Stop reading...')
-                    document.querySelector('#start').disabled = false
-                    document.querySelector('#stop').disabled = true
-                })
-                .catch(error => {
-                    console.log('[ERROR] Stop: ' + error)
-                })
-        }
-
-        function prettifyJSON() {
-            var ugly = document.getElementById('outboundJSON').value;
-            try {
-                var obj = JSON.parse(ugly)
-                var pretty = JSON.stringify(obj, undefined, 4)
-                document.getElementById('outboundJSON').value = pretty;
+        document.getElementById('sendButton').addEventListener('click', function () {
+            sendJSONData(document.getElementById('outboundJSON').value)
+            .then(function(prettyJSON) {
+                document.getElementById('outboundJSON').value = prettyJSON;
                 document.getElementById('sendButton').innerHTML = "Send: <b>OK</b>"
-            } catch {
+            })
+            .catch(function() {
                 document.getElementById('sendButton').innerHTML = "Send: <b>Invalid JSON</b>"
-            }
+            })
+        })
 
-        }
     </script>
 
 </body>
