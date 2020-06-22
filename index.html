@@ -84,7 +84,7 @@
                             </tr>
                             <tr>
                                 <td style="padding:7px 0px;font-family:Verdana,Geneva,sans-serif;color:#000000;">Updated
-                                    2020-06-17</td>
+                                    2020-06-22</td>
                             </tr>
                             <tr>
                                 <td style="padding:0px 0px 0px 0px;"><a href="http://www.siliconwitchery.com"><img
@@ -130,28 +130,25 @@
         <textarea type="text" id="outboundJSON" rows=6>{&#10  "request":["DEVICE"]&#10}</textarea>
         <br>
 
-        <button class="fake" disabled>Response:</button>
+        <button class="fake" id="responseButton" disabled>Response:</button>
         <textarea type="text" id="inboundJSON" rows=6 readonly></textarea>
         <br>
 
     </div>
     <script>
-
+        // Logic for connect/disconnect button
         document.getElementById('connectButton').addEventListener('click', function () {
             connectDisconnect()
                 .then(function (result) {
                     switch (result) {
                         case "disconnected":
-                            document.getElementById('connectButton').innerHTML = "<b>Disconnected</b>";
-                            document.getElementById('appUpdateButton').disabled = true;
-                            document.getElementById('fwUpdateButton').disabled = true;
-                            document.getElementById('sendButton').disabled = true;
-                            setTimeout(function(){
-                                document.getElementById('connectButton').innerHTML = "Connect";
-                            }, 2000);
+                            // This function will handle the UI for us
+                            disconnectHandler(null);
                             break;
                         case "unsecure":
-                            document.getElementById('connectButton').innerHTML = "Connected <b>Unsecure</b>";
+                            // Set the UI elements to allow connected interactions
+                            document.getElementById('connectButton').innerHTML =
+                                "Connected <b>Unsecure</b>";
                             document.getElementById('appUpdateButton').disabled = false;
                             document.getElementById('fwUpdateButton').disabled = false;
                             document.getElementById('sendButton').disabled = false;
@@ -159,29 +156,78 @@
                     }
                 })
                 .catch(function (error) {
+                    // If we couldn't connect, print the reason in the button
                     document.getElementById('connectButton').innerHTML = "<b>" + error + "</b>";
                 })
         })
 
+        // Logic for app update button
         document.getElementById('appUpdateButton').addEventListener('click', function () {
             document.getElementById('appUpdateLink').placeholder = "Feature coming soon!";
         })
 
+        // Logic for radio firmware update button
         document.getElementById('fwUpdateButton').addEventListener('click', function () {
             document.getElementById('fwUpdateLink').placeholder = "Feature coming soon!";
         })
 
+        // Logic for data send button. Should not be called unless device is connected
         document.getElementById('sendButton').addEventListener('click', function () {
+            // Call the JSON send function and print out the formatted JSON
             sendJSONData(document.getElementById('outboundJSON').value)
-            .then(function(prettyJSON) {
-                document.getElementById('outboundJSON').value = prettyJSON;
-                document.getElementById('sendButton').innerHTML = "Send: <b>OK</b>"
-            })
-            .catch(function() {
-                document.getElementById('sendButton').innerHTML = "Send: <b>Invalid JSON</b>"
-            })
+                .then(function (prettyJSON) {
+                    document.getElementById('outboundJSON').value = prettyJSON;
+                    document.getElementById('sendButton').innerHTML = "Send: <b>OK</b>"
+                })
+                .catch(function () {
+                    // If the JSON was invalid, print an error
+                    document.getElementById('sendButton').innerHTML = "Send: <b>Invalid JSON</b>"
+                })
         })
 
+        // Handles logic to disable buttons and interactions when device is disconnected
+        function disconnectHandler(event) {
+            document.getElementById('connectButton').innerHTML = "<b>Disconnected</b>";
+            document.getElementById('appUpdateButton').disabled = true;
+            document.getElementById('fwUpdateButton').disabled = true;
+            document.getElementById('sendButton').disabled = true;
+            setTimeout(function () {
+                // Show "Disconnected" for 2s, then "Connect" again
+                document.getElementById('connectButton').innerHTML = "Connect";
+            }, 2000);
+        }
+
+        // Variable to keep track of how long ago the last message came in over bluetooth
+        var lastResponseTime;
+
+        // Call the function to update the time stamp every second
+        var intervalID = window.setInterval(updateLastResponseTimeCallback, 1000);
+
+        // Function to update the message response box with incoming JSON string
+        function updateResponseBox(prettyJSON) {
+            document.getElementById('inboundJSON').value = prettyJSON;
+            lastResponseTime = Date.now();
+            updateLastResponseTimeCallback();
+        }
+
+        // Calculate and prints the timestamp of the last message
+        function updateLastResponseTimeCallback() {
+            var time = Math.abs(lastResponseTime - Date.now());
+            var timeAsText = "∞";
+
+            // If time since last message is less than 10min, then print the time
+            if (time < (10*60*1000)) {
+                var seconds = Math.floor((time / 1000) % 60),
+                    minutes = Math.floor((time / (1000 * 60)) % 60);
+
+                minutes = (minutes < 10) ? "0" + minutes : minutes;
+                seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+                timeAsText = minutes + ":" + seconds;
+            }
+
+            document.getElementById('responseButton').innerHTML = "Response " + timeAsText + " ago";
+        }
     </script>
 
 </body>

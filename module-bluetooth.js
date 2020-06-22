@@ -1,23 +1,25 @@
-// var device;
+// Global device and characteristic objects
 var device = null;
-var characteristic = null;
+var downlinkCharacteristic = null;
+var uplinkCharacteristic = null;
 
+// UUIDs for services and characteristics
 var siliconwitcheryUUID = "48fd0000-184d-fe9e-e84d-bfc537115aab";
-var superStackService   = "48fd0001-184d-fe9e-e84d-bfc537115aab";
-var superStackCharDL    = "48fd0002-184d-fe9e-e84d-bfc537115aab";
-var superStackCharUL    = "48fd0003-184d-fe9e-e84d-bfc537115aab";
+var superStackService = "48fd0001-184d-fe9e-e84d-bfc537115aab";
+var superStackCharDL = "48fd0002-184d-fe9e-e84d-bfc537115aab";
+var superStackCharUL = "48fd0003-184d-fe9e-e84d-bfc537115aab";
 
-// Function to check if bluetooth is availabe in the browser
+// Promise function to check if bluetooth is availabe in the browser
 function isWebBluetoothAvailable() {
     return new Promise((resolve, reject) => {
         navigator.bluetooth ? resolve() : reject("BLE not available");
     });
 }
 
-// Function to connect and disconnect, returning status
+// Function to connect and disconnect, returning status as promise
 async function connectDisconnect() {
     try {
-        // First make sure web bluetooth is available
+        // First ensure web bluetooth is available
         await isWebBluetoothAvailable();
 
         // Disconnect if connected
@@ -32,41 +34,76 @@ async function connectDisconnect() {
         device = await navigator.bluetooth.requestDevice({
             filters: [{
                 namePrefix: "SuperStack",
-                services:[superStackService]
+                services: [superStackService]
             }]
         });
 
+        // Handler to watch for device being disconnected due to loss of connection
+        device.addEventListener('gattserverdisconnected', disconnectHandler);
+
+        // Connect to device and get primary service as well as characteristics
         const server = await device.gatt.connect();
-
         const service = await server.getPrimaryService(superStackService);
+        downlinkCharacteristic = await service.getCharacteristic(superStackCharDL);
+        uplinkCharacteristic = await service.getCharacteristic(superStackCharUL);
 
-        const characteristic = await service.getCharacteristic(superStackCharDL);
+        // Start notifications on receving characteristic and crete handler
+        await uplinkCharacteristic.startNotifications();
+        uplinkCharacteristic.addEventListener('characteristicvaluechanged', uplinkNotificationHandler);
 
+        // Connected as unsecure method
         return Promise.resolve("unsecure");
 
     } catch (error) {
+        // Return error if there is any
         return Promise.reject(error);
     }
 }
 
-// Function to transmit some data to the device
+// Function to transmit data to the device. Takes JSON and also checks it
 async function sendJSONData(unformattedJSON) {
     try {
-        // Check the JSON is valid
-        const formattedJSON = JSON.stringify(JSON.parse(unformattedJSON),
-            undefined, 
-            4);
-        
-        // Minify
+        // Check if the JSON is valid
+        const formattedJSON = JSON.stringify(JSON.parse(unformattedJSON), undefined, 2);
+
+        // Strip out all the whitespaces (minify) as this is what we will send
         const minifiedJSON = JSON.stringify(JSON.parse(unformattedJSON));
 
-        if (characteristic) {
-            console.log(minifiedJSON); // <--- send this
+        // If the characteristic is available, we send the JSON
+        if (downlinkCharacteristic) {
+            // Encode the string to array and write value
+            let encoder = new TextEncoder('utf-8');
+            let sendMsg = encoder.encode(minifiedJSON);
+            await downlinkCharacteristic.writeValue(sendMsg);
         }
 
-        // Return formatted JSON
+        // Return formatted JSON to print
         return Promise.resolve(formattedJSON);
+
     } catch {
+        // Otherwise the JSON was invalid. Reject promise
         return Promise.reject();
+    }
+}
+
+// Callback handling received data from bluetooth
+function uplinkNotificationHandler(event) {
+
+    // Decode the byte array into a string
+    const decoder = new TextDecoder('utf-8');
+    let value = event.target.value;
+    let decodedString = decoder.decode(value);
+
+    // Remove the last NULL character
+    decodedString = decodedString.slice(0, -1);
+
+    // Pass the returned JSON to the main window
+    try {
+        const formattedJSON = JSON.stringify(JSON.parse(decodedString), undefined, 2);
+        updateResponseBox(formattedJSON);
+
+    } catch {
+        // If it couldn't parse, then it's invalid. Pass anyway to show user
+        updateResponseBox("JSON Invalid: " + decodedString);
     }
 }
