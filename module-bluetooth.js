@@ -67,13 +67,18 @@ async function sendJSONData(unformattedJSON) {
         const formattedJSON = JSON.stringify(JSON.parse(unformattedJSON), undefined, 2);
 
         // Strip out all the whitespaces (minify) as this is what we will send
-        const minifiedJSON = JSON.stringify(JSON.parse(unformattedJSON));
+        var minifiedJSON = JSON.stringify(JSON.parse(unformattedJSON));
 
         // If the characteristic is available, we send the JSON
         if (downlinkCharacteristic) {
-            // Encode the string to array and write value
+            // Add \r and \n to start and end of string
+            minifiedJSON = ['\r', minifiedJSON, '\n'].join('');
+
+            // Encode the string to array
             let encoder = new TextEncoder('utf-8');
             let sendMsg = encoder.encode(minifiedJSON);
+
+            // Send the array
             await downlinkCharacteristic.writeValue(sendMsg);
         }
 
