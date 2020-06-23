@@ -99,9 +99,6 @@ function uplinkNotificationHandler(event) {
     let value = event.target.value;
     let decodedString = decoder.decode(value);
 
-    // Remove the last NULL character
-    decodedString = decodedString.slice(0, -1);
-
     // Pass the returned JSON to the main window
     try {
         const formattedJSON = JSON.stringify(JSON.parse(decodedString), undefined, 2);
