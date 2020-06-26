@@ -61,13 +61,19 @@ async function connectDisconnect() {
 }
 
 // Function to transmit data to the device. Takes JSON and also checks it
-async function sendJSONData(unformattedJSON) {
+async function sendJSONData(unformattedJSON, allowBadJSON) {
     try {
-        // Check if the JSON is valid
-        const formattedJSON = JSON.stringify(JSON.parse(unformattedJSON), undefined, 2);
+        var formattedJSON = unformattedJSON
+        var minifiedJSON = unformattedJSON;
 
-        // Strip out all the whitespaces (minify) as this is what we will send
-        var minifiedJSON = JSON.stringify(JSON.parse(unformattedJSON));
+        if (!allowBadJSON)
+        {
+            // Check if the JSON is valid
+            formattedJSON = JSON.stringify(JSON.parse(unformattedJSON), undefined, 2);
+
+            // Strip out all the whitespaces (minify) as this is what we will send
+            minifiedJSON = JSON.stringify(JSON.parse(unformattedJSON));
+        }
 
         // If the characteristic is available, we send the JSON
         if (downlinkCharacteristic) {

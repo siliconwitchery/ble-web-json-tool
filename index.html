@@ -126,16 +126,24 @@
         <button id="deviceResetButton" disabled>Reset Device</button>
         <br>
 
+        <button id="addTemplateButton" disabled>Add Template</button>
+        <button id="removeTemplateButton" disabled>Remove Template</button>
+        <button id="requestTemplateButton" disabled>Request Template</button>
+        <br>
+
         <button id="sendButton" disabled>Send</button>
-        <textarea type="text" id="outboundJSON" rows=6>{&#10  "request":["DEVICE"]&#10}</textarea>
+        <textarea type="text" id="outboundJSON" rows=8></textarea>
         <br>
 
         <button class="fake" id="responseButton" disabled>Response:</button>
-        <textarea type="text" id="inboundJSON" rows=6 readonly></textarea>
+        <textarea type="text" id="inboundJSON" rows=8 readonly></textarea>
         <br>
 
     </div>
     <script>
+        // Variable to allow bad JSON to be sent
+        var force = false;
+
         // Logic for connect/disconnect button
         document.getElementById('connectButton').addEventListener('click', function () {
             connectDisconnect()
@@ -152,6 +160,9 @@
                             document.getElementById('appUpdateButton').disabled = false;
                             document.getElementById('fwUpdateButton').disabled = false;
                             document.getElementById('sendButton').disabled = false;
+                            document.getElementById('addTemplateButton').disabled = false;
+                            document.getElementById('removeTemplateButton').disabled = false;
+                            document.getElementById('requestTemplateButton').disabled = false;
                             break;
                     }
                 })
@@ -171,18 +182,40 @@
             document.getElementById('fwUpdateLink').placeholder = "Feature coming soon!";
         })
 
+        // Logic for add template button
+        document.getElementById('addTemplateButton').addEventListener('click', function () {
+            document.getElementById('outboundJSON').value = "{\n  \"add\": {\n    \n  }\n}";
+        })
+
+        // Logic for remove template button
+            document.getElementById('removeTemplateButton').addEventListener('click', function () {
+            document.getElementById('outboundJSON').value = "{\n  \"remove\": {\n    \n  }\n}";
+        })
+
+        // Logic for request template button
+            document.getElementById('requestTemplateButton').addEventListener('click', function () {
+            document.getElementById('outboundJSON').value = "{\n  \"request\": {\n    \n  }\n}";
+        })
+
         // Logic for data send button. Should not be called unless device is connected
         document.getElementById('sendButton').addEventListener('click', function () {
             // Call the JSON send function and print out the formatted JSON
-            sendJSONData(document.getElementById('outboundJSON').value)
+            sendJSONData(document.getElementById('outboundJSON').value, force)
                 .then(function (prettyJSON) {
                     document.getElementById('outboundJSON').value = prettyJSON;
-                    document.getElementById('sendButton').innerHTML = "Send: <b>OK</b>"
+                    document.getElementById('sendButton').innerHTML = "Send <b>OK</b>";
+                    force = false;
                 })
                 .catch(function () {
                     // If the JSON was invalid, print an error
-                    document.getElementById('sendButton').innerHTML = "Send: <b>Invalid JSON</b>"
+                    document.getElementById('sendButton').innerHTML = "<b>Invalid</b> Send anyway";
+                    force = true;
                 })
+        })
+
+        document.getElementById("outboundJSON").addEventListener("input", function() {
+            document.getElementById('sendButton').innerHTML = "Send";
+            force = false;
         })
 
         // Handles logic to disable buttons and interactions when device is disconnected
@@ -191,6 +224,9 @@
             document.getElementById('appUpdateButton').disabled = true;
             document.getElementById('fwUpdateButton').disabled = true;
             document.getElementById('sendButton').disabled = true;
+            document.getElementById('addTemplateButton').disabled = true;
+            document.getElementById('removeTemplateButton').disabled = true;
+            document.getElementById('requestTemplateButton').disabled = true;
             setTimeout(function () {
                 // Show "Disconnected" for 2s, then "Connect" again
                 document.getElementById('connectButton').innerHTML = "Connect";
@@ -216,7 +252,7 @@
             var timeAsText = "∞";
 
             // If time since last message is less than 10min, then print the time
-            if (time < (10*60*1000)) {
+            if (time < (10 * 60 * 1000)) {
                 var seconds = Math.floor((time / 1000) % 60),
                     minutes = Math.floor((time / (1000 * 60)) % 60);
 
